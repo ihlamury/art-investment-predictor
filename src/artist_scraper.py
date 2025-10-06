@@ -1,6 +1,7 @@
 """
 Artist information scraper
 """
+from database_manager import ArtDatabase
 import requests
 from bs4 import BeautifulSoup
 from anthropic import Anthropic
@@ -96,13 +97,14 @@ class ArtistScraper:
             print(f"Error analyzing with Claude: {e}")
             return None
     
-    def scrape_artist_full(self, artist_name, base_url):
+    def scrape_artist_full(self, artist_name, base_url, save_to_db=True):
         """
         Scrape multiple pages of an artist's website
         
         Args:
             artist_name (str): Artist's name
             base_url (str): Base website URL
+            save_to_db (bool): Whether to save to database
             
         Returns:
             dict: Extracted artist information
@@ -146,6 +148,13 @@ class ArtistScraper:
             artist_data['website'] = base_url
             print("✅ Successfully extracted artist data:")
             print(json.dumps(artist_data, indent=2))
+            
+            # Save to database
+            if save_to_db:
+                print("\nSaving to database...")
+                db = ArtDatabase()
+                artist_id = db.add_artist(artist_data)
+                print(f"✅ Saved to database (Artist ID: {artist_id})")
         
         return artist_data
 
