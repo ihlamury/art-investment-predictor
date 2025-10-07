@@ -62,3 +62,6 @@ htmlcov/
 
 # Logs
 *.log
+
+# Project documentation (local context for Claude Code)
+CLAUDE.MD

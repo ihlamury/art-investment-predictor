@@ -50,28 +50,48 @@ class ArtistScraper:
         
         return text
     
+    def detect_url_type(self, url):
+        """Detect the type of URL to determine scraping strategy"""
+        url_lower = url.lower()
+
+        if 'wikipedia.org' in url_lower:
+            return 'wikipedia'
+        elif 'saatchiart.com' in url_lower:
+            return 'saatchiart'
+        elif 'artsy.net' in url_lower:
+            return 'artsy'
+        else:
+            return 'artist_website'
+
     def analyze_with_claude(self, artist_name, website_text):
         """Use Claude to extract structured artist information"""
         prompt = f"""
         Analyze this artist's website content and extract key information.
-        
+
         Artist name: {artist_name}
-        
+
         Website content:
         {website_text[:8000]}  # Limit to avoid token limits
-        
+
         Extract and return ONLY a JSON object with these fields (use null if not found):
         {{
             "name": "{artist_name}",
             "education": "where they studied (degrees, institutions)",
             "art_style": "their artistic style and medium",
             "gallery_representation": "galleries that represent them",
-            "exhibition_history": "notable exhibitions or shows",
+            "exhibition_history": "list notable exhibitions with FULL NAMES including the venue/location (e.g., '55th Venice Biennial, Venice' or 'Documenta 14, Kassel', NOT just 'Venice' or 'Kassel')",
             "website": "website URL",
             "career_stage": "emerging/mid-career/established",
             "notable_achievements": "awards, residencies, publications"
         }}
-        
+
+        IMPORTANT for exhibition_history: Always include the full exhibition name AND location together.
+        Examples:
+        - "55th Venice Biennial, Venice" (GOOD)
+        - "Venice" (BAD - missing exhibition name)
+        - "Documenta 14, Kassel, Germany" (GOOD)
+        - "Solo exhibition at MoMA PS1, New York" (GOOD)
+
         Return ONLY valid JSON, no other text.
         """
         
@@ -100,27 +120,42 @@ class ArtistScraper:
     def scrape_artist_full(self, artist_name, base_url, save_to_db=True):
         """
         Scrape multiple pages of an artist's website
-        
+
         Args:
             artist_name (str): Artist's name
-            base_url (str): Base website URL
+            base_url (str): Base website URL (can be artist website, Wikipedia, Saatchi Art, etc.)
             save_to_db (bool): Whether to save to database
-            
+
         Returns:
             dict: Extracted artist information
         """
         print(f"Scraping website for {artist_name}...")
         print(f"Base URL: {base_url}\n")
-        
-        # Common page paths to check
-        pages_to_check = [
-            '',           # Homepage
-            '/about',
-            '/bio',
-            '/cv',
-            '/exhibitions',
-            '/resume'
-        ]
+
+        # Detect URL type and determine which pages to scrape
+        url_type = self.detect_url_type(base_url)
+        print(f"Detected URL type: {url_type}")
+
+        # Define page paths based on URL type
+        if url_type == 'wikipedia':
+            # Wikipedia - just scrape the main page
+            pages_to_check = ['']
+        elif url_type == 'saatchiart':
+            # Saatchi Art - has specific structure
+            pages_to_check = ['', '/cv', '/biography']
+        elif url_type == 'artsy':
+            # Artsy - usually single page with all info
+            pages_to_check = ['', '/cv', '/shows', '/articles']
+        else:
+            # Artist website - try common paths
+            pages_to_check = [
+                '',           # Homepage
+                '/about',
+                '/bio',
+                '/cv',
+                '/exhibitions',
+                '/resume'
+            ]
         
         all_text = []
         

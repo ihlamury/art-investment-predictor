@@ -69,10 +69,15 @@ class ArtDatabase:
         """Add or update artist information"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
+        # Convert exhibition_history to JSON string if it's a list
+        exhibition_history = artist_data.get('exhibition_history')
+        if isinstance(exhibition_history, list):
+            exhibition_history = json.dumps(exhibition_history)
+
         cursor.execute('''
-            INSERT OR REPLACE INTO artists 
-            (name, education, art_style, gallery_representation, 
+            INSERT OR REPLACE INTO artists
+            (name, education, art_style, gallery_representation,
              exhibition_history, website, data_collected_date, raw_data)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
@@ -80,12 +85,12 @@ class ArtDatabase:
             artist_data.get('education'),
             artist_data.get('art_style'),
             artist_data.get('gallery_representation'),
-            artist_data.get('exhibition_history'),
+            exhibition_history,
             artist_data.get('website'),
             datetime.now().isoformat(),
             json.dumps(artist_data.get('raw_data', {}))
         ))
-        
+
         conn.commit()
         artist_id = cursor.lastrowid
         conn.close()
@@ -95,19 +100,27 @@ class ArtDatabase:
         """Retrieve artist data by name"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         cursor.execute('SELECT * FROM artists WHERE name = ?', (name,))
         result = cursor.fetchone()
         conn.close()
-        
+
         if result:
+            # Parse exhibition_history from JSON if it's a JSON string
+            exhibition_history = result[5]
+            try:
+                if exhibition_history and exhibition_history.startswith('['):
+                    exhibition_history = json.loads(exhibition_history)
+            except:
+                pass  # Keep as string if JSON parsing fails
+
             return {
                 'artist_id': result[0],
                 'name': result[1],
                 'education': result[2],
                 'art_style': result[3],
                 'gallery_representation': result[4],
-                'exhibition_history': result[5],
+                'exhibition_history': exhibition_history,
                 'website': result[6],
                 'data_collected_date': result[7]
             }
